@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>إدارة مشاكل السائقين - Keeta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#18181b',
+                        darkcard: '#23232a',
+                        darkborder: '#33334d',
+                        darktext: '#e5e7eb',
+                        darkaccent: '#60a5fa',
+                        darksub: '#a1a1aa',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body id="mainBody" class="bg-white dark:bg-darkbg min-h-screen p-6 flex flex-col items-center transition-colors">
+    <div class="w-full max-w-xl bg-white dark:bg-darkcard p-8 rounded-2xl shadow-lg mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-blue-900 dark:text-darktext">إدارة المشاكل</h2>
+            <div class="flex gap-2 items-center">
+                <button id="toggleMode" type="button"
+                    class="bg-gray-300 dark:bg-darkborder text-gray-800 dark:text-darktext px-3 py-1 rounded shadow hover:bg-gray-400 dark:hover:bg-darkcard transition text-sm flex items-center gap-1">
+                    <span id="modeIcon">🌙</span> <span id="modeText">دارك</span>
+                </button>
+                <a href="index.html"
+                    class="bg-gray-200 dark:bg-darkborder text-blue-900 dark:text-darktext px-4 py-2 rounded-lg shadow hover:bg-gray-300 dark:hover:bg-darkcard transition">⬅️
+                    رجوع</a>
+            </div>
+        </div>
+        <form id="issueForm" class="space-y-5">
+            <input type="hidden" id="editId" />
+            <div>
+                <label for="type" class="font-bold block mb-1 dark:text-darktext">نوع المشكلة:</label>
+                <select id="type"
+                    class="w-full border p-2 rounded text-right dark:bg-darkcard dark:text-darktext dark:border-darkborder">
+                    <option value="order">طلب</option>
+                    <option value="non-order">غير متعلق بالطلب</option>
+                </select>
+            </div>
+            <div>
+                <label for="title" class="font-bold block mb-1 dark:text-darktext">عنوان الصفحة:</label>
+                <input type="text" id="title"
+                    class="w-full border p-2 rounded text-right dark:bg-darkcard dark:text-darktext dark:border-darkborder"
+                    required />
+            </div>
+            <div>
+                <label for="titleLink" class="font-bold block mb-1 flex items-center gap-2 dark:text-darktext">لينك
+                    العنوان <span class="text-xl">🔗</span>:</label>
+                <input type="url" id="titleLink"
+                    class="w-full border p-2 rounded text-right pr-10 dark:bg-darkcard dark:text-darktext dark:border-darkborder"
+                    required />
+            </div>
+            <div>
+                <label for="desc" class="font-bold block mb-1 dark:text-darktext">وصف المحتوى:</label>
+                <textarea id="desc"
+                    class="w-full border p-2 rounded text-right dark:bg-darkcard dark:text-darktext dark:border-darkborder"
+                    required></textarea>
+            </div>
+            <div>
+                <label class="font-bold block mb-1 dark:text-darktext">النقاط:</label>
+                <div id="pointsList" class="mb-2 space-y-2"></div>
+                <div class="flex flex-col md:flex-row gap-2 items-center">
+                    <input type="text" id="pointName"
+                        class="border p-2 rounded text-right flex-1 dark:bg-darkcard dark:text-darktext dark:border-darkborder"
+                        placeholder="اسم النقطة" />
+                    <input type="url" id="pointLink"
+                        class="border p-2 rounded text-right flex-1 dark:bg-darkcard dark:text-darktext dark:border-darkborder"
+                        placeholder="لينك النقطة" />
+                    <button type="button" id="addPointBtn"
+                        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">إضافة</button>
+                </div>
+            </div>
+            <button type="submit"
+                class="w-full bg-green-600 text-white text-lg py-2 rounded-lg hover:bg-green-700 transition"
+                id="submitBtn">إضافة المشكلة</button>
+            <button type="button"
+                class="w-full bg-gray-400 dark:bg-darkborder text-white text-lg py-2 rounded-lg hover:bg-gray-500 dark:hover:bg-darkcard transition hidden"
+                id="cancelEditBtn">إلغاء التعديل</button>
+        </form>
+    </div>
+    <div class="w-full max-w-3xl bg-white dark:bg-darkcard p-6 rounded-2xl shadow-lg">
+        <h3 class="text-xl font-bold mb-4 text-blue-900 dark:text-darktext">كل المشاكل</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm border border-gray-200 dark:border-darkborder">
+                <thead class="bg-gray-100 dark:bg-darkborder">
+                    <tr>
+                        <th class="p-2 dark:text-darktext">العنوان</th>
+                        <th class="p-2 dark:text-darktext">الوصف</th>
+                        <th class="p-2 dark:text-darktext">النقاط</th>
+                        <th class="p-2 dark:text-darktext">خيارات</th>
+                    </tr>
+                </thead>
+                <tbody id="issuesTable"></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const PORT = "http://localhost:5000"
+        document.body.style.direction = 'rtl';
+        // دارك/لايت مود
+        const body = document.getElementById('mainBody');
+        const toggleBtn = document.getElementById('toggleMode');
+        const modeIcon = document.getElementById('modeIcon');
+        const modeText = document.getElementById('modeText');
+        function setMode(mode) {
+            if (mode === 'dark') {
+                body.classList.add('dark');
+                modeIcon.textContent = '☀️';
+                modeText.textContent = 'لايت';
+                localStorage.setItem('mode', 'dark');
+            } else {
+                body.classList.remove('dark');
+                modeIcon.textContent = '🌙';
+                modeText.textContent = 'دارك';
+                localStorage.setItem('mode', 'light');
+            }
+        }
+        // عند أول تحميل: اجعل الوضع الافتراضي لايت إذا لم يكن هناك اختيار محفوظ
+        const savedMode = localStorage.getItem('mode');
+        setMode(savedMode === 'dark' ? 'dark' : 'light');
+        toggleBtn.addEventListener('click', function () {
+            setMode(body.classList.contains('dark') ? 'light' : 'dark');
+        });
+
+        let points = [];
+        let editing = false;
+        let editingId = null;
+        const pointsList = document.getElementById('pointsList');
+        const addPointBtn = document.getElementById('addPointBtn');
+        const pointName = document.getElementById('pointName');
+        const pointLink = document.getElementById('pointLink');
+        const form = document.getElementById('issueForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const editIdInput = document.getElementById('editId');
+
+        function renderPoints() {
+            pointsList.innerHTML = points.map((p, i) => `
+        <div class="flex items-center gap-2 bg-gray-100 dark:bg-darkborder rounded px-3 py-1">
+          <span class="font-semibold text-blue-900 dark:text-darktext">${p.name}</span>
+          <a href="${p.link}" target="_blank" class="text-blue-600 dark:text-darkaccent hover:underline flex items-center gap-1">🔗 <span>رابط</span></a>
+          <button type="button" onclick="removePoint(${i})" class="text-red-500 hover:text-red-700 ml-auto">حذف</button>
+          <button type="button" onclick="editPoint(${i})" class="text-yellow-600 hover:text-yellow-800">تعديل</button>
+        </div>
+      `).join('');
+        }
+        window.removePoint = function (idx) {
+            points.splice(idx, 1);
+            renderPoints();
+        }
+        window.editPoint = function (idx) {
+            pointName.value = points[idx].name;
+            pointLink.value = points[idx].link;
+            addPointBtn.textContent = 'حفظ التعديل';
+            addPointBtn.dataset.editing = idx;
+        }
+        addPointBtn.onclick = function () {
+            if (!pointName.value.trim() || !pointLink.value.trim()) {
+                alert('يرجى إدخال اسم النقطة والرابط.');
+                return;
+            }
+            if (addPointBtn.dataset.editing !== undefined) {
+                // تعديل نقطة
+                const idx = parseInt(addPointBtn.dataset.editing);
+                points[idx] = { name: pointName.value.trim(), link: pointLink.value.trim() };
+                addPointBtn.textContent = 'إضافة';
+                delete addPointBtn.dataset.editing;
+            } else {
+                points.push({ name: pointName.value.trim(), link: pointLink.value.trim() });
+            }
+            pointName.value = '';
+            pointLink.value = '';
+            renderPoints();
+        }
+        cancelEditBtn.onclick = function () {
+            editing = false;
+            editingId = null;
+            editIdInput.value = '';
+            submitBtn.textContent = 'إضافة المشكلة';
+            cancelEditBtn.classList.add('hidden');
+            form.reset();
+            points = [];
+            renderPoints();
+        }
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const type = document.getElementById('type').value;
+            const title = document.getElementById('title').value;
+            const titleLink = document.getElementById('titleLink').value;
+            const desc = document.getElementById('desc').value;
+            if (points.length === 0) {
+                alert('يرجى إضافة نقطة واحدة على الأقل.');
+                return;
+            }
+            if (editing && editingId) {
+                // تعديل مشكلة
+                try {
+                    const res = await fetch(`${PORT}/issues/${editingId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type, title, titleLink, desc, points })
+                    });
+                    if (!res.ok) throw new Error('فشل في التعديل');
+                    await loadIssues();
+                    cancelEditBtn.onclick();
+                } catch (err) {
+                    alert('حدث خطأ أثناء التعديل!');
+                }
+            } else {
+                // إضافة جديدة
+                try {
+                    const res = await fetch(`${PORT}/issues`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type, title, titleLink, desc, points })
+                    });
+                    if (!res.ok) throw new Error('فشل في الإضافة');
+                    await loadIssues();
+                    form.reset();
+                    points = [];
+                    renderPoints();
+                } catch (err) {
+                    alert('حدث خطأ أثناء الإضافة!');
+                }
+            }
+        });
+        async function loadIssues() {
+            const res = await fetch(`${PORT}/issues`);
+            const issues = await res.json();
+            const table = document.getElementById('issuesTable');
+            table.innerHTML = '';
+            issues.forEach(issue => {
+                const pointsHTML = `<ul class='list-disc list-inside space-y-1'>${issue.points.map(point => `<li><span class='font-semibold dark:text-darktext'>${point.name}</span> <a href='${point.link}' target='_blank' class='text-blue-600 dark:text-darkaccent hover:underline text-xs break-all'>${point.link}</a></li>`).join('')}</ul>`;
+                const row = `<tr class='border-b dark:border-darkborder'>
+          <td class='p-2 font-bold dark:text-darktext'>${issue.title}</td>
+          <td class='p-2 dark:text-darksub'>${issue.desc}</td>
+          <td class='p-2'>${pointsHTML}</td>
+          <td class='p-2 flex gap-1'>
+            <button onclick='editIssue("${issue._id}")' class='bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 transition'>تعديل</button>
+            <button onclick='deleteIssue("${issue._id}")' class='bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition'>حذف</button>
+          </td>
+        </tr>`;
+                table.innerHTML += row;
+            });
+        }
+        window.editIssue = async function (id) {
+            const res = await fetch(`${PORT}/issues`);
+            const issues = await res.json();
+            const issue = issues.find(i => i._id === id);
+            if (!issue) return;
+            editing = true;
+            editingId = id;
+            editIdInput.value = id;
+            document.getElementById('type').value = issue.type;
+            document.getElementById('title').value = issue.title;
+            document.getElementById('titleLink').value = issue.titleLink;
+            document.getElementById('desc').value = issue.desc;
+            points = issue.points.map(p => ({ ...p }));
+            renderPoints();
+            submitBtn.textContent = 'حفظ التعديلات';
+            cancelEditBtn.classList.remove('hidden');
+        }
+        window.deleteIssue = async function (id) {
+            if (!confirm('هل أنت متأكد من حذف هذه المشكلة؟')) return;
+            await fetch(`${PORT}/issues/${id}`, { method: 'DELETE' });
+            await loadIssues();
+            if (editingId === id) cancelEditBtn.onclick();
+        }
+        loadIssues();
+        renderPoints();
+    </script>
+</body>
+
+</html>
